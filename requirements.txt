@@ -1,0 +1,16 @@
+# Advanced LAN Chat - Requirements
+# This project uses only Python standard library modules
+# Python 3.6+ required
+
+# Standard library modules used:
+# - socket (networking)
+# - threading (concurrency)
+# - json (message serialization)
+# - cmd (interactive shell)
+# - struct (binary data packing)
+# - hashlib (password hashing)
+# - time (timestamps)
+# - os (system operations)
+# - sys (system parameters)
+
+# No external dependencies required!
