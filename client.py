@@ -13,7 +13,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from script.protocol import *
+from protocol import *
 
 class ChatClient:
     """Main chat client class"""
