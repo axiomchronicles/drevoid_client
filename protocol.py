@@ -26,6 +26,8 @@ class MessageType(Enum):
     ERROR = "error"
     SUCCESS = "success"
     NOTIFICATION = "notification"
+    FLAG_SUBMIT = "flag_submit"
+    FLAG_LIST = "flag_list"
 
 class UserRole(Enum):
     """User roles in the chat system"""

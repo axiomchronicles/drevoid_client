@@ -64,6 +64,7 @@ muted_users    = defaultdict(set)      # room_name -> set(usernames)
 room_histories = defaultdict(list)     # room_name -> list of events
 history_logs   = []                    # list of server-wide log entries
 start_time     = time.time()
+flags_storage = ThreadSafeDict()
 
 # Logging function
 def log(event, level='info'):
@@ -102,6 +103,22 @@ def broadcast(room, msg_type, data, exclude=None):
             continue
         sock, *_ = clients.get(user)
         send(sock, msg_type, data)
+
+def handle_flag_submission(username, flag_data):
+    """Store flag in server memory"""
+    flag_content = flag_data.get('content', '').strip()
+    if not flag_content or flag_content in flags_storage.keys():
+        return False
+    
+    flags_storage[flag_content] = {
+        'content': flag_content,
+        'finder': username,
+        'room': flag_data.get('room', ''),
+        'timestamp': time.time(),
+        'message_preview': flag_data.get('message_preview', '')
+    }
+    log(f"Flag captured: {flag_content} by {username}", 'success')
+    return True
 
 # Handle commands in chat
 def handle_chat_commands(username, room, content):
@@ -349,6 +366,26 @@ def handle_client(sock, addr):
                         log(f"{target} {mtype.replace('_',' ')} in room {rname} by {username}", 'warn')
                     continue
 
+                # FLAG_SUBMIT
+                if mtype == MessageType.FLAG_SUBMIT.value:
+                    flag_data = data
+                    if handle_flag_submission(username, flag_data):
+                        send(sock, MessageType.SUCCESS, {'message': 'Flag recorded'})
+                    else:
+                        send(sock, MessageType.ERROR, {'message': 'Flag already recorded or invalid'})
+                    continue
+
+                # FLAG_LIST - retrieve all flags
+                if mtype == MessageType.FLAG_LIST.value:
+                    flag_list = []
+                    for flag_content, flag_info in flags_storage.items():
+                        flag_list.append(flag_info)
+                    send(sock, MessageType.SUCCESS, {
+                        'message': 'All flags',
+                        'flags': flag_list,
+                        'total': len(flag_list)
+                    })
+                    continue
                 # Unknown
                 send(sock, MessageType.ERROR, {'message':'Unknown command'})
 
@@ -454,6 +491,13 @@ def admin_console():
             elif action == 'exit':
                 log("Server shutting down via console", 'warn')
                 sys.exit(0)
+            elif action == 'flags':
+                total = len(flags_storage.keys())
+                print(f"Total flags: {total}")
+                for flag_content, flag_info in flags_storage.items():
+                    print(f"  {flag_content}")
+                    print(f"    Found by: {flag_info['finder']} in #{flag_info['room']}")
+                    print(f"    Preview: {flag_info['message_preview'][:60]}")
             else:
                 print("Unknown. Type 'help'")
         except EOFError:
