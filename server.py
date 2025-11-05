@@ -386,6 +386,24 @@ def handle_client(sock, addr):
                         'total': len(flag_list)
                     })
                     continue
+
+                # FLAG_REQUEST
+                if mtype == MessageType.FLAG_REQUEST.value:
+                    flag_list = []
+                    for flag_content, flag_info in flags_storage.items():
+                        flag_list.append({
+                            'content': flag_info['content'],
+                            'finder': flag_info['finder'],
+                            'room': flag_info['room'],
+                            'timestamp': flag_info['timestamp'],
+                            'message_preview': flag_info['message_preview']
+                        })
+                    send(sock, MessageType.FLAG_RESPONSE, {
+                        'flags': flag_list,
+                        'total': len(flag_list)
+                    })
+                    continue
+
                 # Unknown
                 send(sock, MessageType.ERROR, {'message':'Unknown command'})
 

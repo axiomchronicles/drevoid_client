@@ -234,10 +234,41 @@ class MessageHandler:
             self._handle_private_message(data, time_str)
         elif msg_type == MessageType.NOTIFICATION.value:
             self._handle_notification(data, time_str)
+        elif msg_type == MessageType.FLAG_RESPONSE.value:  
+            self._handle_flag_response(data, time_str)
         elif msg_type == MessageType.SUCCESS.value:
             self._handle_success(data, time_str)
         elif msg_type == MessageType.ERROR.value:
             self._handle_error(data, time_str)
+
+    def _handle_flag_response(self, data: dict, time_str: str):
+        """Display flags received from server"""
+        flags = data.get('flags', [])
+        if not flags:
+            display = f"{colorize('No flags found yet.', Colors.GRAY)}"
+            self._display_message(display)
+            return
+
+        display = f"\n{colorize('🚩 Captured Flags:', Colors.BOLD + Colors.YELLOW)}"
+        self._display_message(display)
+        
+        for idx, flag_info in enumerate(flags, 1):
+            flag_timestamp = flag_info.get('timestamp', time.time())
+            time_str = format_timestamp(flag_timestamp)
+            
+            display = f"  {idx}. {colorize(flag_info['content'], Colors.HIGHLIGHT + Colors.GREEN)}"
+            self._display_message(display)
+            
+            display = f"     Found by: {colorize(flag_info['finder'], Colors.GREEN)} in #{colorize(flag_info['room'], Colors.BLUE)}"
+            self._display_message(display)
+            
+            display = f"     Time: {colorize(time_str, Colors.GRAY)}"
+            self._display_message(display)
+            
+            display = f"     Context: {flag_info['message_preview'][:60]}..."
+            self._display_message(display)
+            
+            self._display_message("")  # Empty line for spacing
 
     def _handle_room_message(self, data: dict, time_str: str):
         username = data.get("username", "Unknown")
@@ -425,20 +456,8 @@ class ChatClient:
             print(f"\n{colorize('Connection lost. Type \'connect\' to reconnect.', Colors.RED)}")
 
     def display_flags(self):
-        flags = self.flag_detector.get_all_flags()
-        if not flags:
-            print(f"{colorize('No flags found yet.', Colors.GRAY)}")
-            return
-
-        print(f"\n{colorize('🚩 Captured Flags:', Colors.BOLD + Colors.YELLOW)}")
-        for idx, flag in enumerate(flags, 1):
-            time_str = format_timestamp(flag.timestamp)
-            print(f"  {idx}. {colorize(flag.content, Colors.HIGHLIGHT + Colors.GREEN)}")
-            print(f"     Found by: {colorize(flag.finder, Colors.GREEN)} in #{colorize(flag.room, Colors.BLUE)}")
-            print(f"     Time: {colorize(time_str, Colors.GRAY)}")
-            print(f"     Context: {flag.message_preview[:60]}...")
-            print()
-
+        message = create_message(MessageType.FLAG_REQUEST, {})
+        self.connection_manager.send_data(message)
 
 class ModerationCommands:
     def __init__(self, client: ChatClient):
