@@ -771,7 +771,3 @@ def main():
     finally:
         if 'client' in locals() and client.connected:
             client.disconnect()
-
-
-if __name__ == "__main__":
-    main()
