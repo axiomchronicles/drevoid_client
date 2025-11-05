@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from protocol import *
 from notification import NotificationManager
+from emojis import EmojiAliasesInstance as EmojiAliases
 
 class Colors:
     RED = '\033[91m'
@@ -243,9 +244,7 @@ class MessageHandler:
         content = data.get("content", "")
         room = data.get("room", "")
 
-        if username == self.username:
-            return
-
+        content = EmojiAliases.replace(content)
         flags = self.flag_detector.detect(content)
         if flags:
             for flag in flags:
@@ -263,6 +262,9 @@ class MessageHandler:
                 })
                 self.connection_manager.send_data(flag_submit_msg)
 
+        if username == self.username:
+            return
+
         highlighted_content = self._highlight_flags(content)
         display = f"\n{colorize(f'[{time_str}]', Colors.GRAY)} {colorize(f'{username}', Colors.CYAN)} in {colorize(f'#{room}', Colors.BLUE)}: {highlighted_content}"
         self._display_message(display)
@@ -270,6 +272,7 @@ class MessageHandler:
     def _handle_private_message(self, data: dict, time_str: str):
         from_user = data.get("from", "Unknown")
         content = data.get("content", "")
+        content = EmojiAliases.replace(content)
         highlighted_content = self._highlight_flags(content)
         display = f"\n{colorize(f'📩 [{time_str}] Private from {from_user}:', Colors.PURPLE)} {highlighted_content}"
         self._display_message(display)
@@ -517,6 +520,9 @@ class ChatShell(cmd.Cmd):
         print(f"  {colorize('flags', Colors.CYAN)} - Display all captured flags")
         print(f"  {colorize('flag-count', Colors.CYAN)} - Show total flags found")
 
+        print(f"\n{colorize('Emoji Commands:', Colors.YELLOW)}")
+        print(f"  {colorize('emojis', Colors.CYAN)} - Display all emoji aliases\"")
+
         print(f"\n{colorize('Moderation Commands:', Colors.YELLOW)}")
         print(f"  {colorize('kick <username>', Colors.CYAN)} - Kick user from room (moderators only)")
         print(f"  {colorize('ban <username>', Colors.CYAN)} - Ban user from room (moderators only)")
@@ -623,6 +629,13 @@ class ChatShell(cmd.Cmd):
 
     def do_pm(self, args):
         self._send_private_message(args)
+
+    def do_emojis(self, args):
+        print(f"\n{colorize('😊 Emoji Aliases', Colors.BOLD + Colors.YELLOW)}")
+        print(f"{colorize('Use these secret phrases to add emojis to your messages:', Colors.GRAY)}\n")
+        print(EmojiAliases.list_aliases())
+        print(f"\n{colorize('Example:', Colors.YELLOW)} I love this :heart: :fire: :rocket:\n")
+
 
     def _send_private_message(self, args):
         if not self.client.connected:
