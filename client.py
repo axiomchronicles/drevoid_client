@@ -453,7 +453,7 @@ class ChatClient:
 
         self.connection_manager.disconnect()
         if self.shell:
-            print(f"\n{colorize('Connection lost. Type \'connect\' to reconnect.', Colors.RED)}")
+            print(f"\n{colorize('Connection lost. Type connect to reconnect.', Colors.RED)}")
 
     def display_flags(self):
         message = create_message(MessageType.FLAG_REQUEST, {})
@@ -508,10 +508,10 @@ class ChatShell(cmd.Cmd):
 
     def default(self, line):
         if not self.client.connected:
-            print(f"{colorize('❌ Not connected. Use \'connect\' command first.', Colors.RED)}")
+            print(f"{colorize('❌ Not connected. Use connect command first.', Colors.RED)}")
             return
         if not self.client.current_room:
-            print(f"{colorize('❌ Not in any room. Use \'join\' command first.', Colors.RED)}")
+            print(f"{colorize('❌ Not in any room. Use join command first.', Colors.RED)}")
             return
         if line.strip():
             self.client.send_message(line.strip())
