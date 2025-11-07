@@ -3,7 +3,6 @@ from typing import Dict, List, Tuple
 
 class EmojiAliases:
     _BASE_ALIASES: Dict[str, str] = {
-        # ❤️ Emotions & Faces
         "heart": "❤️", "love": "❤️", "sparkling_heart": "💖", "broken_heart": "💔", "two_hearts": "💕",
         "kiss": "😘", "heart_eyes": "😍", "hug": "🤗", "smile": "😊", "happy": "😁", "grin": "😄",
         "laugh": "😆", "joy": "😂", "wink": "😉", "blush": "☺️", "relieved": "😌", "cool": "😎",
@@ -14,35 +13,25 @@ class EmojiAliases:
         "nerd": "🤓", "monocle": "🧐", "ghost": "👻", "clown": "🤡", "poop": "💩", "robot": "🤖",
         "sick": "🤢", "vomit": "🤮", "mask": "😷", "yawn": "🥱", "sleep": "😴", "dizzy": "😵",
         "relaxed": "😌", "facepalm": "🤦", "shrug": "🤷", "eyeroll": "🙄", "cool_face": "🆒",
-
-        # 👋 Gestures & Hands
         "thumbsup": "👍", "thumbsdown": "👎", "ok": "👌", "ok_hand": "👌", "clap": "👏", "pray": "🙏",
         "wave": "👋", "fist": "✊", "peace": "✌️", "crossed_fingers": "🤞", "point_up": "☝️",
         "point_down": "👇", "point_left": "👈", "point_right": "👉", "call_me": "🤙",
         "muscle": "💪", "writing": "✍️", "nail_polish": "💅", "handshake": "🤝",
         "raised_hands": "🙌", "tada": "🎉", "flex": "💪",
-
-        # 🌎 Nature & Animals
         "sun": "☀️", "moon": "🌙", "star": "⭐", "spark": "✨", "sparkles": "✨", "fire": "🔥",
         "rain": "🌧️", "snow": "❄️", "zap": "⚡", "leaf": "🍃", "seedling": "🌱", "earth": "🌎",
         "dog": "🐶", "cat": "🐱", "lion": "🦁", "tiger": "🐯", "panda": "🐼", "bear": "🐻",
         "unicorn": "🦄", "rabbit": "🐰", "monkey": "🐒", "frog": "🐸", "bird": "🐦", "bee": "🐝",
         "butterfly": "🦋", "fish": "🐠", "whale": "🐋", "dolphin": "🐬",
-
-        # 🍔 Food & Drink
         "pizza": "🍕", "burger": "🍔", "fries": "🍟", "hotdog": "🌭", "taco": "🌮", "burrito": "🌯",
         "sushi": "🍣", "ramen": "🍜", "cake": "🎂", "cookie": "🍪", "donut": "🍩", "icecream": "🍦",
         "coffee": "☕", "tea": "🍵", "beer": "🍺", "wine": "🍷", "cocktail": "🍸",
         "clinking_glasses": "🥂", "popcorn": "🍿", "chocolate": "🍫", "apple": "🍎", "banana": "🍌",
-
-        # 💻 Tech & Work
         "computer": "💻", "laptop": "💻", "phone": "📱", "call": "📞", "mail": "✉️", "calendar": "📅",
         "clock": "⏰", "camera": "📷", "video": "🎬", "lightbulb": "💡", "gear": "⚙️", "hammer": "🔨",
         "wrench": "🔧", "shield": "🛡️", "key": "🔑", "lock": "🔒", "unlock": "🔓", "link": "🔗",
         "bug": "🐛", "code": "💻", "cybersec": "🔐", "terminal": "🖥️", "rocket": "🚀",
         "satellite": "🛰️", "robot_face": "🤖",
-
-        # 🎮 Entertainment & Misc
         "music": "🎵", "guitar": "🎸", "drum": "🥁", "microphone": "🎤", "film": "🎞️",
         "game": "🎮", "dice": "🎲", "trophy": "🏆", "medal": "🎖️", "star_struck": "🤩",
         "book": "📚", "pen": "🖊️", "paint": "🎨", "art": "🖼️", "gift": "🎁", "flag": "🚩",
@@ -50,8 +39,6 @@ class EmojiAliases:
         "megaphone": "📣", "speaker": "🔊", "bell": "🔔", "mute": "🔇", "mailbox": "📫",
         "chart": "📈", "money": "💰", "coin": "🪙", "wallet": "👛", "shopping": "🛒",
         "crown": "👑", "ring": "💍", "gem": "💎",
-
-        # ⚠️ Symbols
         "warning": "⚠️", "info": "ℹ️", "check": "✅", "cross": "❌", "100": "💯",
         "boom": "💥", "hourglass": "⌛", "hourglass_flowing_sand": "⏳",
         "question": "❓", "exclamation": "❗", "infinity": "♾️", "peace_symbol": "☮️",
@@ -82,23 +69,22 @@ class EmojiAliases:
             if emoji:
                 for s in syns:
                     self.aliases[s] = emoji
-        self._compiled: List[Tuple[re.Pattern, str]] = []
-        self._rebuild_compiled()
+        self._lower_aliases = {k.lower(): v for k, v in self.aliases.items()}
+        self._pattern, self._group_count = self._compile_pattern()
 
-    def _rebuild_compiled(self):
-        self._compiled.clear()
-        for key in sorted(self.aliases.keys(), key=len, reverse=True):
-            emoji = self.aliases[key]
-            k = re.escape(key)
-            pattern = rf"(?<!\S):?{k}:?(?=\s|$|[.,!?;:\)\(\]\[])" 
-            self._compiled.append((re.compile(pattern, re.IGNORECASE), emoji))
+    def _compile_pattern(self) -> Tuple[re.Pattern, int]:
+        keys = sorted(map(re.escape, self._lower_aliases.keys()), key=len, reverse=True)
+        joined = "|".join(keys)
+        pattern = re.compile(rf":({joined}):", re.IGNORECASE)
+        return pattern, len(keys)
 
     def replace(self, content: str) -> str:
         if not content:
             return content
-        for regex, emoji in self._compiled:
-            content = regex.sub(lambda m: emoji, content)
-        return content
+        def _repl(m: re.Match) -> str:
+            k = m.group(1).lower()
+            return self._lower_aliases.get(k, m.group(0))
+        return self._pattern.sub(_repl, content)
 
     def add_alias(self, key: str, emoji: str, synonyms: List[str] = None):
         if not key or not emoji:
@@ -107,16 +93,16 @@ class EmojiAliases:
         if synonyms:
             for s in synonyms:
                 self.aliases[s] = emoji
-        self._rebuild_compiled()
+        self._lower_aliases = {k.lower(): v for k, v in self.aliases.items()}
+        self._pattern, self._group_count = self._compile_pattern()
 
     def list_aliases(self) -> str:
-        lines: List[str] = []
         emoji_map: Dict[str, List[str]] = {}
         for k, e in sorted(self.aliases.items()):
             emoji_map.setdefault(e, []).append(k)
+        lines: List[str] = []
         for emoji, keys in sorted(emoji_map.items(), key=lambda x: -len(x[1])):
             lines.append(f"{emoji}  {', '.join(sorted(set([f':{k}:' for k in keys])))}")
         return "\n".join(lines)
-
 
 EmojiAliasesInstance = EmojiAliases()

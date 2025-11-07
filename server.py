@@ -3,11 +3,12 @@ import threading
 import time
 import struct
 import sys
+import argparse
 from protocol import *
 from collections import defaultdict
 
-HOST = '0.0.0.0'
-PORT = 12345
+DEFAULT_HOST = "10.157.106.208"
+DEFAULT_PORT = 8891
 
 # ANSI color codes
 COLOR_RESET   = '\033[0m'
@@ -522,13 +523,22 @@ def admin_console():
             continue
 
 def main():
+    parser = argparse.ArgumentParser(description="Start the chat server.")
+    parser.add_argument("--host", type=str, default=DEFAULT_HOST, help="Host IP address (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port number (default: 5000)")
+    args = parser.parse_args()
+
+    HOST = args.host
+    PORT = args.port
+
     rooms['general'] = {
-        'type':'public',
-        'password_hash':'',
-        'users':set(),
-        'max_users':100,
-        'password_protected':False
+        'type': 'public',
+        'password_hash': '',
+        'users': set(),
+        'max_users': 100,
+        'password_protected': False
     }
+
     log(f"Server starting on {HOST}:{PORT}", 'success')
 
     serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
