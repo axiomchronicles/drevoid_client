@@ -2,21 +2,8 @@
 """
 install.py
 
-Detects the host OS (Linux, macOS, Windows) and installs a small wrapper so that
-`drevoid` becomes available in the user's PATH and runs your `client.py` from
-anywhere.
-
-Usage:
-    python install.py [--source /path/to/client.py] [--name drevoid]
-
-Behavior summary:
- - On Linux/macOS: creates an executable wrapper script named `drevoid` in a
-   suitable bin directory (prefers ~/.local/bin if available). The wrapper
-   executes the system python to run your client script.
- - On Windows: copies the client script to the chosen PATH directory as
-   `drevoid.py` and creates a `drevoid.bat` wrapper that calls Python.
-
-The installer will not overwrite an existing installation without prompting.
+Installer that adds a command alias (default: drevoid) for client.py.
+Overwrites existing installations automatically.
 """
 
 from __future__ import annotations
@@ -26,134 +13,149 @@ import platform
 import shutil
 import stat
 import sys
+import tempfile
 from pathlib import Path
 
+DEFAULT_NAME = "drevoid"
+DEFAULT_SOURCE = "start_client.py"
 
-def find_writable_path_dir(preferred_candidates=None):
-    """Return first writable dir from PATH or preferred candidates, else None."""
-    path_env = os.environ.get("PATH", "")
+
+def is_executable_dir(path: Path) -> bool:
+    try:
+        return path.exists() and os.access(str(path), os.W_OK | os.X_OK)
+    except Exception:
+        return False
+
+
+def path_dirs_from_env() -> list[Path]:
     sep = ";" if os.name == "nt" else ":"
-    path_dirs = [Path(p).expanduser() for p in path_env.split(sep) if p]
+    return [Path(p).expanduser() for p in os.environ.get("PATH", "").split(sep) if p]
 
-    if preferred_candidates:
-        for p in preferred_candidates:
-            p = Path(p).expanduser()
-            if p.exists() and os.access(p, os.W_OK | os.X_OK):
-                return p
 
-    for d in path_dirs:
-        if d.exists() and os.access(d, os.W_OK | os.X_OK):
+def pick_target_dir(preferred: list[Path] | None = None) -> Path | None:
+    if preferred:
+        for p in preferred:
+            if is_executable_dir(p.expanduser()):
+                return p.expanduser()
+    for d in path_dirs_from_env():
+        if is_executable_dir(d):
             return d
-
     return None
 
 
-def ensure_dir(path: Path):
-    if not path.exists():
-        path.mkdir(parents=True, exist_ok=True)
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
 
 
-def install_posix(source: Path, name: str) -> Path:
-    candidates = [Path("~/.local/bin").expanduser(), Path("~/bin").expanduser()]
-    target_dir = find_writable_path_dir(preferred_candidates=candidates)
+def atomic_write(path: Path, data: str, mode: int = 0o755) -> None:
+    ensure_dir(path.parent)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent))
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+        f.write(data)
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
 
+
+def install_posix(source: Path, name: str, target_dir: Path | None, symlink: bool, verbose: bool) -> Path:
     if target_dir is None:
-        target_dir = Path("~/.local/bin").expanduser()
-        try:
-            ensure_dir(target_dir)
-        except Exception:
-            if Path("/usr/local/bin").exists() and os.access("/usr/local/bin", os.W_OK):
-                target_dir = Path("/usr/local/bin")
-            else:
-                raise RuntimeError(
-                    "No writable bin directory found. Please create ~/.local/bin and add it to PATH."
-                )
+        candidates = [Path("~/.local/bin").expanduser(), Path("~/bin").expanduser()]
+        target_dir = pick_target_dir(candidates) or Path("~/.local/bin").expanduser()
+        ensure_dir(target_dir)
 
     wrapper_path = target_dir / name
     if wrapper_path.exists():
-        raise FileExistsError(f"Target {wrapper_path} already exists. Remove it or choose a different name.")
+        try:
+            wrapper_path.unlink()
+        except Exception:
+            pass
 
-    wrapper_contents = f"""#!/usr/bin/env bash
-# Auto-generated wrapper to run your client.py as `{name}`
-exec "$(command -v python3 || command -v python)" "{str(source)}" "$@"
-"""
+    if symlink:
+        try:
+            wrapper_path.symlink_to(source)
+            if verbose:
+                print(f"Symlinked {wrapper_path} → {source}")
+            return wrapper_path
+        except OSError:
+            pass
 
-    wrapper_path.write_text(wrapper_contents)
-    # Make executable
-    st = wrapper_path.stat().st_mode
-    wrapper_path.chmod(st | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
+    python_bin = Path(sys.executable).resolve()
+    wrapper_contents = (
+        f"#!{python_bin}\n"
+        f'import runpy, sys\nsys.argv[0] = "{source}"\nrunpy.run_path("{source}", run_name="__main__")\n'
+    )
+    atomic_write(wrapper_path, wrapper_contents)
+    if verbose:
+        print(f"Installed {wrapper_path} using {python_bin}")
     return wrapper_path
 
 
-def install_windows(source: Path, name: str) -> Path:
-    # Find writable PATH dir
-    path_dirs = [Path(p).expanduser() for p in os.environ.get("PATH", "").split(";") if p]
-    target_dir = None
-    for d in path_dirs:
-        try:
-            d = d.expanduser()
-            if d.exists() and os.access(d, os.W_OK):
-                target_dir = d
-                break
-        except Exception:
-            continue
-
+def install_windows(source: Path, name: str, target_dir: Path | None, verbose: bool) -> Path:
     if target_dir is None:
-        up = Path.home() / "bin"
-        ensure_dir(up)
-        target_dir = up
+        target_dir = next((d for d in path_dirs_from_env() if d.exists() and os.access(str(d), os.W_OK)), None)
+        if target_dir is None:
+            target_dir = Path.home() / "bin"
+            ensure_dir(target_dir)
 
     target_py = target_dir / f"{name}.py"
     if target_py.exists():
-        raise FileExistsError(f"Target {target_py} already exists. Remove it or choose a different name.")
-
+        try:
+            target_py.unlink()
+        except Exception:
+            pass
     shutil.copy2(source, target_py)
+    target_py.chmod(target_py.stat().st_mode | stat.S_IEXEC)
 
     wrapper_bat = target_dir / f"{name}.bat"
-    bat_contents = (
-        "@echo off\r\n"
-        f"python \"%~dp0\\{name}.py\" %*\r\n"
-    )
-
-    wrapper_bat.write_text(bat_contents)
-
+    if wrapper_bat.exists():
+        try:
+            wrapper_bat.unlink()
+        except Exception:
+            pass
+    bat_contents = "@echo off\r\n" f"\"{sys.executable}\" \"%~dp0\\{name}.py\" %*\r\n"
+    atomic_write(wrapper_bat, bat_contents, 0o666)
+    if verbose:
+        print(f"Copied {source} to {target_py} and created {wrapper_bat}")
     return wrapper_bat
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description="Install client.py as a global 'drevoid' command")
-    parser.add_argument("--source", "-s", default="client.py", help="Path to client.py (default: ./client.py)")
-    parser.add_argument("--name", "-n", default="drevoid", help="Command name to create (default: drevoid)")
-    args = parser.parse_args(argv)
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(prog="install.py")
+    p.add_argument("--source", "-s", default=DEFAULT_SOURCE)
+    p.add_argument("--name", "-n", default=DEFAULT_NAME)
+    p.add_argument("--target-dir", "-t", type=Path, default=None)
+    p.add_argument("--symlink", action="store_true")
+    p.add_argument("--verbose", "-v", action="store_true")
+    return p.parse_args(argv)
 
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
     source = Path(args.source).expanduser().resolve()
     if not source.exists():
-        print(f"Error: source script not found: {source}")
-        sys.exit(2)
+        print(f"Error: source not found: {source}")
+        return 2
 
     name = args.name
-
+    target_dir = args.target_dir.expanduser().resolve() if args.target_dir else None
     system = platform.system().lower()
 
     try:
         if system == "windows":
-            installed = install_windows(source, name)
+            installed = install_windows(source, name, target_dir, args.verbose)
         elif system in ("linux", "darwin"):
-            installed = install_posix(source, name)
+            installed = install_posix(source, name, target_dir, args.symlink, args.verbose)
         else:
-            raise RuntimeError(f"Unsupported OS: {system}")
-    except FileExistsError as e:
-        print(str(e))
-        print("If you want to overwrite, remove the existing file and run again.")
-        sys.exit(3)
+            print(f"Unsupported OS: {system}")
+            return 4
     except Exception as e:
         print(f"Installation failed: {e}")
-        sys.exit(4)
+        return 5
 
-    print(f"Installed wrapper: {installed}")
-    print("If that directory is not on your PATH, add it to run '" + name + "' from anywhere.")
+    print(f"Installed: {installed}")
+    if str(installed.parent) not in os.environ.get("PATH", ""):
+        print(f"Note: {installed.parent} is not in your PATH.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
