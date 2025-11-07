@@ -7,7 +7,7 @@ import argparse
 from protocol import *
 from collections import defaultdict
 
-DEFAULT_HOST = "10.157.106.208"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8891
 
 # ANSI color codes
