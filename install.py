@@ -2,8 +2,12 @@
 """
 install.py
 
-Installer that adds a command alias (default: drevoid) for client.py.
-Overwrites existing installations automatically.
+Cross-platform installer that creates a global alias (default: 'drevoid')
+to run your Python client script (default: start_client.py) from anywhere.
+
+✅ Overwrites existing installations automatically.
+✅ Embeds the correct absolute path to the client script.
+✅ Works on Linux, macOS, and Windows.
 """
 
 from __future__ import annotations
@@ -18,6 +22,47 @@ from pathlib import Path
 
 DEFAULT_NAME = "drevoid"
 DEFAULT_SOURCE = "start_client.py"
+
+# Template for the installed launcher on POSIX and Windows (.py)
+LAUNCHER_TEMPLATE = r'''#!/usr/bin/env python3
+import sys, os, traceback, importlib.util
+from pathlib import Path
+
+CLIENT_PATH = r"{CLIENT_PATH}"
+
+def main():
+    try:
+        client_path = Path(CLIENT_PATH).expanduser().resolve()
+        if not client_path.exists():
+            raise FileNotFoundError(f"Missing required file: {client_path}")
+
+        project_root = client_path.parent
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+        spec = importlib.util.spec_from_file_location("client", client_path)
+        client = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(client)
+
+        if hasattr(client, "main") and callable(client.main):
+            client.main()
+        else:
+            print("[WARNING] client.py has no callable 'main()' function.")
+
+    except FileNotFoundError as e:
+        print(f"[ERROR] {e}")
+        sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception:
+        print(f"\n[CRITICAL] Unhandled error while launching client.py:\n")
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    os.environ.setdefault("PYTHONUNBUFFERED", "1")
+    main()
+'''
 
 
 def is_executable_dir(path: Path) -> bool:
@@ -56,7 +101,7 @@ def atomic_write(path: Path, data: str, mode: int = 0o755) -> None:
     os.replace(tmp, path)
 
 
-def install_posix(source: Path, name: str, target_dir: Path | None, symlink: bool, verbose: bool) -> Path:
+def install_posix(source: Path, name: str, target_dir: Path | None, verbose: bool) -> Path:
     if target_dir is None:
         candidates = [Path("~/.local/bin").expanduser(), Path("~/bin").expanduser()]
         target_dir = pick_target_dir(candidates) or Path("~/.local/bin").expanduser()
@@ -64,28 +109,12 @@ def install_posix(source: Path, name: str, target_dir: Path | None, symlink: boo
 
     wrapper_path = target_dir / name
     if wrapper_path.exists():
-        try:
-            wrapper_path.unlink()
-        except Exception:
-            pass
+        wrapper_path.unlink(missing_ok=True)
 
-    if symlink:
-        try:
-            wrapper_path.symlink_to(source)
-            if verbose:
-                print(f"Symlinked {wrapper_path} → {source}")
-            return wrapper_path
-        except OSError:
-            pass
-
-    python_bin = Path(sys.executable).resolve()
-    wrapper_contents = (
-        f"#!{python_bin}\n"
-        f'import runpy, sys\nsys.argv[0] = "{source}"\nrunpy.run_path("{source}", run_name="__main__")\n'
-    )
-    atomic_write(wrapper_path, wrapper_contents)
+    launcher_code = LAUNCHER_TEMPLATE.replace("{CLIENT_PATH}", str(source))
+    atomic_write(wrapper_path, launcher_code)
     if verbose:
-        print(f"Installed {wrapper_path} using {python_bin}")
+        print(f"[POSIX] Installed {wrapper_path} → {source}")
     return wrapper_path
 
 
@@ -97,34 +126,35 @@ def install_windows(source: Path, name: str, target_dir: Path | None, verbose: b
             ensure_dir(target_dir)
 
     target_py = target_dir / f"{name}.py"
-    if target_py.exists():
+    target_bat = target_dir / f"{name}.bat"
+
+    # Remove old ones if exist
+    for f in (target_py, target_bat):
         try:
-            target_py.unlink()
+            f.unlink(missing_ok=True)
         except Exception:
             pass
-    shutil.copy2(source, target_py)
+
+    # Write the launcher with embedded client path
+    launcher_code = LAUNCHER_TEMPLATE.replace("{CLIENT_PATH}", str(source))
+    atomic_write(target_py, launcher_code)
     target_py.chmod(target_py.stat().st_mode | stat.S_IEXEC)
 
-    wrapper_bat = target_dir / f"{name}.bat"
-    if wrapper_bat.exists():
-        try:
-            wrapper_bat.unlink()
-        except Exception:
-            pass
-    bat_contents = "@echo off\r\n" f"\"{sys.executable}\" \"%~dp0\\{name}.py\" %*\r\n"
-    atomic_write(wrapper_bat, bat_contents, 0o666)
+    # .bat file to run the Python launcher
+    bat_contents = f'@echo off\r\n"{sys.executable}" "%~dp0\\{name}.py" %*\r\n'
+    atomic_write(target_bat, bat_contents, 0o666)
+
     if verbose:
-        print(f"Copied {source} to {target_py} and created {wrapper_bat}")
-    return wrapper_bat
+        print(f"[WIN] Installed {target_py} and {target_bat} → {source}")
+    return target_bat
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(prog="install.py")
-    p.add_argument("--source", "-s", default=DEFAULT_SOURCE)
-    p.add_argument("--name", "-n", default=DEFAULT_NAME)
-    p.add_argument("--target-dir", "-t", type=Path, default=None)
-    p.add_argument("--symlink", action="store_true")
-    p.add_argument("--verbose", "-v", action="store_true")
+    p = argparse.ArgumentParser(prog="install.py", description="Installer for drevoid client launcher")
+    p.add_argument("--source", "-s", default=DEFAULT_SOURCE, help="Path to the client launcher (default: start_client.py)")
+    p.add_argument("--name", "-n", default=DEFAULT_NAME, help="Command name to install (default: drevoid)")
+    p.add_argument("--target-dir", "-t", type=Path, default=None, help="Optional target directory")
+    p.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
     return p.parse_args(argv)
 
 
@@ -143,7 +173,7 @@ def main(argv=None) -> int:
         if system == "windows":
             installed = install_windows(source, name, target_dir, args.verbose)
         elif system in ("linux", "darwin"):
-            installed = install_posix(source, name, target_dir, args.symlink, args.verbose)
+            installed = install_posix(source, name, target_dir, args.verbose)
         else:
             print(f"Unsupported OS: {system}")
             return 4
@@ -151,9 +181,9 @@ def main(argv=None) -> int:
         print(f"Installation failed: {e}")
         return 5
 
-    print(f"Installed: {installed}")
+    print(f"✅ Installed: {installed}")
     if str(installed.parent) not in os.environ.get("PATH", ""):
-        print(f"Note: {installed.parent} is not in your PATH.")
+        print(f"⚠️  Note: {installed.parent} is not in your PATH.")
     return 0
 
 
