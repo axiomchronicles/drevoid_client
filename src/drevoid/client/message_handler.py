@@ -7,6 +7,7 @@ from ..core.protocol import MessageType, Colors, colorize, format_timestamp, cre
 from ..ctf.flag_detector import FlagDetector
 from ..utils.emoji_aliases import EmojiAliases
 from ..utils.notifications import NotificationManager
+from ..ui.ui_components import StatusIndicator, FlagDisplay, UserDisplay, RoomDisplay
 
 
 class MessageHandler:
@@ -132,15 +133,15 @@ class MessageHandler:
         content = EmojiAliases.replace(content)
         highlighted_content = self._highlight_flags(content)
         display = (
-            f"\n{colorize(f'📩 [{time_str}] Private from {from_user}:', Colors.PURPLE)} "
-            f"{highlighted_content}"
+            f"\n{StatusIndicator.PRIVATE} {colorize(f'[{time_str}] Private from', Colors.PURPLE)} "
+            f"{colorize(from_user, Colors.CYAN)}: {highlighted_content}"
         )
         self._display_message(display)
 
     def _handle_notification(self, data: dict, time_str: str) -> None:
         """Handle notification."""
         message_text = data.get("message", "")
-        display = f"\n{colorize(f'📢 [{time_str}]', Colors.YELLOW)} {message_text}"
+        display = f"\n{StatusIndicator.NOTIFICATION} {colorize(f'[{time_str}]', Colors.YELLOW)} {message_text}"
         self._display_message(display)
 
     def _handle_flag_response(self, data: dict, time_str: str) -> None:
@@ -182,47 +183,36 @@ class MessageHandler:
         users = data.get("users", [])
         stats = data.get("stats", {})
 
-        display = f"\n{colorize('✅', Colors.GREEN)} {message_text}"
+        display = f"\n{StatusIndicator.SUCCESS} {colorize(message_text, Colors.GREEN)}"
         self._display_message(display)
 
         if rooms:
-            display = f"\n{colorize('🏠 Available Rooms:', Colors.BOLD)}"
+            display = f"\n{colorize('🏠 Available Rooms:', Colors.BOLD + Colors.CYAN)}"
             self._display_message(display)
             for room in rooms:
-                protection = "🔒" if room["password_protected"] else "🔓"
-                room_type = f"({room['type']})"
-                users_info = f"{room['users']}/{room['max_users']}"
-                display = (
-                    f"  {protection} {colorize(room['name'], Colors.CYAN)} "
-                    f"{room_type} - {users_info} users"
-                )
+                display = RoomDisplay.format_room(room)
                 self._display_message(display)
 
         if users:
-            display = f"\n{colorize('👥 Users in room:', Colors.BOLD)}"
+            display = UserDisplay.format_users_list(users)
             self._display_message(display)
-            for user in users:
-                is_mod = user["is_moderator"]
-                role_color = Colors.RED if user["role"] == "admin" else (Colors.YELLOW if is_mod else Colors.WHITE)
-                role_symbol = "👑" if user["role"] == "admin" else ("⭐" if is_mod else "👤")
-                display = f"  {role_symbol} {colorize(user['username'], role_color)}"
-                self._display_message(display)
 
         if stats:
             uptime = stats.get("uptime", 0)
             hours = int(uptime // 3600)
             minutes = int((uptime % 3600) // 60)
-            display = f"\n{colorize('📊 Server Stats:', Colors.BOLD)}"
+            display = f"\n{colorize('📊 Server Stats:', Colors.BOLD + Colors.YELLOW)}"
             self._display_message(display)
-            display = f"  Users: {stats.get('connected_users', 0)}"
+            from ..ui.ui_components import UIBox
+            display = UIBox.stat_row("Connected Users:", str(stats.get("connected_users", 0)))
             self._display_message(display)
-            display = f"  Rooms: {stats.get('active_rooms', 0)}"
+            display = UIBox.stat_row("Active Rooms:", str(stats.get("active_rooms", 0)))
             self._display_message(display)
-            display = f"  Uptime: {hours:02d}:{minutes:02d}"
+            display = UIBox.stat_row("Server Uptime:", f"{hours:02d}:{minutes:02d}")
             self._display_message(display)
 
     def _handle_error(self, data: dict, time_str: str) -> None:
         """Handle error response."""
         message_text = data.get("message", "")
-        display = f"\n{colorize('❌ Error:', Colors.RED)} {message_text}"
+        display = f"\n{StatusIndicator.ERROR} {colorize(message_text, Colors.RED)}"
         self._display_message(display)

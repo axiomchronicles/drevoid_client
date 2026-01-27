@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ..core.protocol import Colors, colorize
 from ..utils.emoji_aliases import EmojiAliases
 from .moderation import ModerationCommands
+from .ui_components import UIBox, StatusIndicator, FlagDisplay, UserDisplay, RoomDisplay, MenuBar
 
 if TYPE_CHECKING:
     from ..client.chat_client import ChatClient
@@ -76,45 +77,45 @@ class ChatShell(cmd.Cmd):
 
     def do_help(self, arg: str) -> None:
         """Display help information."""
-        print(f"\n{colorize('🎯 Drevoid LAN Chat Commands:', Colors.BOLD)}")
+        print(UIBox.header("🎯 Drevoid LAN Chat Commands", 80))
 
-        print(f"\n{colorize('Connection Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('connect [host] [port] [username]', Colors.CYAN)} - Connect to server")
-        print(f"  {colorize('disconnect', Colors.CYAN)} - Disconnect from server")
-        print(f"  {colorize('quit/exit', Colors.CYAN)} - Exit the application")
+        print(UIBox.section("Connection Commands", Colors.YELLOW))
+        print(f"  {colorize('connect', Colors.CYAN):20} → Connect to server")
+        print(f"  {colorize('disconnect', Colors.CYAN):20} → Disconnect from server")
+        print(f"  {colorize('status', Colors.CYAN):20} → Show connection status")
 
-        print(f"\n{colorize('Room Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('join <room_name> [password]', Colors.CYAN)} - Join a room")
-        print(f"  {colorize('leave', Colors.CYAN)} - Leave current room")
-        print(f"  {colorize('create <room_name> [private] [password]', Colors.CYAN)} - Create a room")
-        print(f"  {colorize('rooms', Colors.CYAN)} - List available rooms")
-        print(f"  {colorize('users', Colors.CYAN)} - List users in current room")
+        print(UIBox.section("Room Commands", Colors.YELLOW))
+        print(f"  {colorize('join <room>', Colors.CYAN):20} → Join a room")
+        print(f"  {colorize('leave', Colors.CYAN):20} → Leave current room")
+        print(f"  {colorize('create <name>', Colors.CYAN):20} → Create a new room")
+        print(f"  {colorize('rooms', Colors.CYAN):20} → List available rooms")
+        print(f"  {colorize('users', Colors.CYAN):20} → List users in room")
 
-        print(f"\n{colorize('Messaging Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('msg <username> <message>', Colors.CYAN)} - Send private message")
-        print(f"  {colorize('pm <username> <message>', Colors.CYAN)} - Send private message (alias)")
-        print(f"  {colorize('<message>', Colors.CYAN)} - Send message to current room")
+        print(UIBox.section("Messaging Commands", Colors.YELLOW))
+        print(f"  {colorize('msg <user> <text>', Colors.CYAN):20} → Send private message")
+        print(f"  {colorize('<message>', Colors.CYAN):20} → Send message to room")
 
-        print(f"\n{colorize('CTF & Flag Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('flags', Colors.CYAN)} - Display all captured flags")
-        print(f"  {colorize('flag-count', Colors.CYAN)} - Show total flags found")
+        print(UIBox.section("CTF & Flag Commands", Colors.YELLOW))
+        print(f"  {colorize('flags', Colors.CYAN):20} → Display captured flags")
+        print(f"  {colorize('flag-count', Colors.CYAN):20} → Show total flags")
 
-        print(f"\n{colorize('Emoji Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('emojis', Colors.CYAN)} - Display all emoji aliases")
+        print(UIBox.section("Utilities", Colors.YELLOW))
+        print(f"  {colorize('emojis', Colors.CYAN):20} → Show emoji aliases")
+        print(f"  {colorize('clear', Colors.CYAN):20} → Clear screen")
+        print(f"  {colorize('help', Colors.CYAN):20} → Show this help")
 
-        print(f"\n{colorize('Moderation Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('kick <username>', Colors.CYAN)} - Kick user from room (mods only)")
-        print(f"  {colorize('ban <username>', Colors.CYAN)} - Ban user from room (mods only)")
+        print(UIBox.section("Moderation Commands", Colors.RED))
+        print(f"  {colorize('kick <user>', Colors.CYAN):20} → Kick user from room (mods only)")
+        print(f"  {colorize('ban <user>', Colors.CYAN):20} → Ban user from room (mods only)")
 
-        print(f"\n{colorize('Other Commands:', Colors.YELLOW)}")
-        print(f"  {colorize('status', Colors.CYAN)} - Show connection status")
-        print(f"  {colorize('clear', Colors.CYAN)} - Clear screen")
-        print(f"  {colorize('help', Colors.CYAN)} - Show this help\n")
+        print(UIBox.section("Exit Commands", Colors.YELLOW))
+        print(f"  {colorize('quit/exit', Colors.CYAN):20} → Exit application")
+        print()
 
     def do_connect(self, args: str) -> None:
         """Connect to server: connect [host] [port] [username]"""
         if self.client.connected:
-            print(f"{colorize('❌ Already connected. Disconnect first.', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Already connected. Disconnect first.")
             return
 
         parts = args.split()
@@ -135,7 +136,7 @@ class ChatShell(cmd.Cmd):
                 )
             )
         except ValueError:
-            print(f"{colorize('❌ Invalid port number', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Invalid port number")
             return
 
         username = (
@@ -145,51 +146,55 @@ class ChatShell(cmd.Cmd):
         )
 
         if not username:
-            print(f"{colorize('❌ Username is required', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Username is required")
             return
 
-        print(f"{colorize('🔄 Connecting to', Colors.YELLOW)} {host}:{port} {colorize('as', Colors.YELLOW)} {username}...")
+        print(f"{StatusIndicator.LOADING} Connecting to {colorize(f'{host}:{port}', Colors.WHITE)} as {colorize(username, Colors.CYAN)}...")
 
         if self.client.connect(host, port, username):
-            print(f"{colorize('✅ Connected successfully!', Colors.GREEN)}")
+            print(f"{StatusIndicator.SUCCESS} Connected successfully!")
             self.update_prompt()
         else:
-            print(f"{colorize('❌ Connection failed', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Connection failed")
 
     def do_disconnect(self, args: str) -> None:
         """Disconnect from server."""
         if not self.client.connected:
-            print(f"{colorize('❌ Not connected', Colors.RED)}")
+            print(f"{StatusIndicator.WARNING} Not connected")
             return
         self.client.disconnect()
         self.update_prompt()
+        print(f"{StatusIndicator.SUCCESS} Disconnected")
 
     def do_join(self, args: str) -> None:
         """Join room: join <room_name> [password]"""
         if not self.client.connected:
-            print(f"{colorize('❌ Not connected', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Not connected")
             return
 
         parts = args.split(None, 1)
         if not parts:
-            print(f"{colorize('❌ Usage: join <room_name> [password]', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Usage: {colorize('join <room_name>', Colors.CYAN)}")
             return
 
         room_name = parts[0]
         password = parts[1] if len(parts) > 1 else ""
 
+        print(f"{StatusIndicator.LOADING} Joining {colorize(room_name, Colors.CYAN)}...")
         if self.client.room_manager.join(room_name, password):
+            print(f"{StatusIndicator.SUCCESS} Joined {colorize(room_name, Colors.CYAN)}")
             self.update_prompt()
 
     def do_leave(self, args: str) -> None:
         """Leave current room."""
         if not self.client.connected:
-            print(f"{colorize('❌ Not connected', Colors.RED)}")
+            print(f"{StatusIndicator.ERROR} Not connected")
             return
         if not self.client.current_room:
-            print(f"{colorize('❌ Not in any room', Colors.RED)}")
+            print(f"{StatusIndicator.WARNING} Not in any room")
             return
         if self.client.room_manager.leave():
+            print(f"{StatusIndicator.SUCCESS} Left room")
             self.update_prompt()
 
     def do_create(self, args: str) -> None:
@@ -263,20 +268,25 @@ class ChatShell(cmd.Cmd):
 
     def do_flags(self, args: str) -> None:
         """Display all captured flags."""
-        self.client.display_flags()
+        flags = self.client.flag_detector.get_all_flags()
+        print(FlagDisplay.format_flags_list(flags))
 
     def do_flag_count(self, args: str) -> None:
         """Show total flags found."""
         count = len(self.client.flag_detector.get_all_flags())
-        print(f"{colorize(f'🚩 Total flags captured: {count}', Colors.BOLD + Colors.YELLOW)}")
+        emoji = StatusIndicator.FLAG
+        print(f"\n{emoji} {colorize(f'Total flags captured: {count}', Colors.BOLD + Colors.YELLOW)}")
 
     def do_status(self, args: str) -> None:
         """Show connection status."""
+        print(UIBox.header("Status", 80))
         if self.client.connected:
-            print(f"{colorize('✅ Connected as:', Colors.GREEN)} {self.client.username}")
-            print(f"{colorize('🏠 Current room:', Colors.CYAN)} {self.client.current_room or 'None'}")
+            print(UIBox.stat_row("Status:", "Connected", Colors.GREEN))
+            print(UIBox.stat_row("Username:", self.client.username or "N/A", Colors.CYAN))
+            print(UIBox.stat_row("Current Room:", self.client.current_room or "None", Colors.BLUE))
         else:
-            print(f"{colorize('❌ Not connected', Colors.RED)}")
+            print(UIBox.stat_row("Status:", "Not Connected", Colors.RED))
+        print()
 
     def do_clear(self, args: str) -> None:
         """Clear screen."""

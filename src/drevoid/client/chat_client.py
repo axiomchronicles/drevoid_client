@@ -169,9 +169,22 @@ class ChatClient:
         return self.connection_manager.send_data(message)
 
     def display_flags(self) -> None:
-        """Request flag list from server."""
-        message = create_message(MessageType.FLAG_REQUEST, {})
-        self.connection_manager.send_data(message)
+        """Display all captured flags locally."""
+        from ..core.protocol import Colors, colorize, format_timestamp
+        
+        flags = self.flag_detector.get_all_flags()
+        if not flags:
+            print(f"{colorize('No flags found yet.', Colors.GRAY)}")
+            return
+
+        print(f"\n{colorize('🚩 Captured Flags:', Colors.BOLD + Colors.YELLOW)}")
+        for idx, flag in enumerate(flags, 1):
+            time_str = format_timestamp(flag.timestamp)
+            finder = colorize(flag.finder, Colors.CYAN)
+            room = colorize(f"#{flag.room}", Colors.BLUE)
+            flag_content = colorize(flag.content, Colors.HIGHLIGHT + Colors.GREEN)
+            print(f"  {idx}. [{time_str}] {finder} in {room}: {flag_content}")
+            print(f"     Preview: {flag.message_preview}")
 
     def _receive_loop(self) -> None:
         """Receive and process messages from server (runs in thread)."""
