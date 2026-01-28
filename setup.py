@@ -16,7 +16,7 @@ if readme_path.exists():
 
 setup(
     name="drevoid",
-    version="1.0.0",
+    version="1.0.1",
     author="Pawan Kumar",
     author_email="aegis.invincible@gmail.com",
     description="Terminal-based LAN chat client with rooms, private messaging, and CTF flag detection",
