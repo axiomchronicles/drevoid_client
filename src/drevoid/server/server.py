@@ -18,6 +18,7 @@ from ..core.protocol import (
 from ..common.logging import Logger
 from .room_manager import ServerRoomManager
 from .client_handler import ClientHandler
+from .admin_console import AdminConsole
 
 
 class ChatServer:
@@ -527,40 +528,9 @@ class ChatServer:
         self.log(f"User disconnected: {username}", "info")
 
     def _admin_console(self) -> None:
-        """Admin console interface (runs in background thread)."""
-        print("\n[Admin Console] Type 'help' for commands")
-
-        while self.running:
-            try:
-                cmd_input = input("admin> ").strip().split()
-                if not cmd_input:
-                    continue
-
-                action = cmd_input[0].lower()
-
-                if action == "help":
-                    print("Commands: users, rooms, stats, flags, stop")
-                elif action == "users":
-                    for u in self.client_handler.clients.keys():
-                        print(f"  {u}")
-                elif action == "rooms":
-                    for r in self.room_manager.rooms.keys():
-                        users = len(self.room_manager.rooms[r]["users"])
-                        print(f"  {r}: {users} users")
-                elif action == "stats":
-                    print(self._get_server_stats())
-                elif action == "flags":
-                    print(f"Total flags: {self.client_handler.get_flags_count()}")
-                elif action == "stop":
-                    self.stop()
-                    break
-                else:
-                    print("Unknown command")
-
-            except EOFError:
-                break
-            except KeyboardInterrupt:
-                pass
+        """Advanced admin console interface (runs in background thread)."""
+        console = AdminConsole(self)
+        console.cmdloop()
 
 
 def main():

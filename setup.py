@@ -1,57 +1,54 @@
 #!/usr/bin/env python3
 """
-Setup script for Drevoid application.
+Setup script for Drevoid Chat Client.
 
-Initializes the environment and makes the application ready to run.
+Installs Drevoid as a Python package with CLI integration.
 """
 
-import os
-import sys
+from setuptools import setup, find_packages
 from pathlib import Path
 
+# Read README for long description
+readme_path = Path(__file__).parent / "README.md"
+long_description = ""
+if readme_path.exists():
+    long_description = readme_path.read_text(encoding="utf-8")
 
-def setup():
-    """Setup the application environment."""
-    print("🚀 Setting up Drevoid Application...")
-
-    # Check Python version
-    if sys.version_info < (3, 10):
-        print("❌ Python 3.10+ required")
-        sys.exit(1)
-
-    print("✅ Python version check passed")
-
-    # Create necessary directories
-    dirs_to_create = [
-        "logs",
-        "data",
-        "config",
-        "tests",
-    ]
-
-    for dir_name in dirs_to_create:
-        path = Path(__file__).parent / dir_name
-        path.mkdir(exist_ok=True)
-        print(f"✅ Created {dir_name} directory")
-
-    # Make scripts executable
-    scripts = [
-        "bin/drevoid-client.py",
-        "bin/drevoid-server.py",
-    ]
-
-    for script in scripts:
-        path = Path(__file__).parent / script
-        if path.exists():
-            os.chmod(path, 0o755)
-            print(f"✅ Made {script} executable")
-
-    print("\n✅ Setup complete!")
-    print("\nNext steps:")
-    print("  1. Start server: python bin/drevoid-server.py")
-    print("  2. Start client: python bin/drevoid-client.py")
-    print("  3. Type 'help' in client for command reference")
-
-
-if __name__ == "__main__":
-    setup()
+setup(
+    name="drevoid",
+    version="1.0.0",
+    author="Pawan Kumar",
+    author_email="aegis.invincible@gmail.com",
+    description="Terminal-based LAN chat client with rooms, private messaging, and CTF flag detection",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/axiomchronicles/drevoid_client",
+    project_urls={
+        "Bug Tracker": "https://github.com/axiomchronicles/drevoid_client/issues",
+        "Documentation": "https://github.com/axiomchronicles/drevoid_client/blob/main/docs",
+    },
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    python_requires=">=3.10",
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: End Users/Desktop",
+        "Topic :: Communications :: Chat",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+        "Operating System :: OS Independent",
+    ],
+    entry_points={
+        "console_scripts": [
+            "dre=drevoid.cli:main",
+        ],
+    },
+    keywords="chat networking lan messaging ctf terminal",
+    include_package_data=True,
+)

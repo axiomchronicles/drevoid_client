@@ -22,6 +22,7 @@ class MessageHandler:
         flag_detector: FlagDetector,
         connection_manager: "ConnectionManager",
         notification_manager: NotificationManager,
+        room_manager: "RoomManager" = None,
     ):
         """
         Initialize message handler.
@@ -30,16 +31,22 @@ class MessageHandler:
             flag_detector: Flag detector instance
             connection_manager: Connection manager instance
             notification_manager: Notification manager instance
+            room_manager: Room manager instance (optional, set later)
         """
         self.flag_detector = flag_detector
         self.connection_manager = connection_manager
         self.notification_manager = notification_manager
+        self.room_manager = room_manager
         self.username: str | None = None
         self.callbacks: List[Callable] = []
 
     def set_username(self, username: str) -> None:
         """Set current username."""
         self.username = username
+    
+    def set_room_manager(self, room_manager: "RoomManager") -> None:
+        """Set room manager reference."""
+        self.room_manager = room_manager
 
     def subscribe(self, callback: Callable) -> None:
         """Subscribe to message display events."""
@@ -143,6 +150,20 @@ class MessageHandler:
         message_text = data.get("message", "")
         display = f"\n{StatusIndicator.NOTIFICATION} {colorize(f'[{time_str}]', Colors.YELLOW)} {message_text}"
         self._display_message(display)
+        
+        # Check if this is a kick/ban/mute notification and update room state
+        if self.room_manager:
+            msg_lower = message_text.lower()
+            
+            # Handle unmute (check before mute)
+            if "unmuted" in msg_lower:
+                self.room_manager.is_muted = False
+            # Handle mute
+            elif "muted" in msg_lower:
+                self.room_manager.is_muted = True
+            # Handle kick, ban, disconnect/remove
+            elif any(word in msg_lower for word in ["kicked", "banned", "disconnected", "removed"]):
+                self.room_manager.leave_room()
 
     def _handle_flag_response(self, data: dict, time_str: str) -> None:
         """Handle flag response."""

@@ -1,0 +1,37 @@
+services:
+  drevoid-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: drevoid-server
+    ports:
+      - "8891:8891"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8891
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - server-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8891"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  server-data:

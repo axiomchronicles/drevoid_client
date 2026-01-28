@@ -58,6 +58,8 @@ class ChatClient:
             self.connection_manager,
             self.notification_manager,
         )
+        # Pass room_manager to message_handler so it can update room state
+        self.message_handler.set_room_manager(self.room_manager)
         self.message_buffer = MessageBuffer()
         self.shell = None
         self.receive_thread: Optional[threading.Thread] = None
@@ -78,7 +80,7 @@ class ChatClient:
         """Get current room name."""
         return self.room_manager.current_room
 
-    def connect(self, host: str = "localhost", port: int = 12345, username: str = "") -> bool:
+    def connect(self, host: str = "ch.tubox.cloud", port: int = 8891, username: str = "") -> bool:
         """
         Connect to server.
 

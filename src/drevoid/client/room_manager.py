@@ -16,6 +16,7 @@ class RoomManager:
         """
         self.connection_manager = connection_manager
         self.current_room: Optional[str] = None
+        self.is_muted: bool = False  # Track mute status
 
     def join(self, room_name: str, password: str = "") -> bool:
         """
@@ -48,6 +49,19 @@ class RoomManager:
             return False
         message = create_message(MessageType.LEAVE_ROOM, {})
         if self.connection_manager.send_data(message):
+            self.current_room = None
+            return True
+        return False
+    
+    def leave_room(self) -> bool:
+        """
+        Leave current room locally (for kick/ban).
+        This just updates local state without sending to server.
+        
+        Returns:
+            True if successful
+        """
+        if self.current_room:
             self.current_room = None
             return True
         return False

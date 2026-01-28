@@ -122,8 +122,8 @@ class ChatShell(cmd.Cmd):
         host = (
             parts[0]
             if parts
-            else input(f"{colorize('Enter server host (localhost):', Colors.CYAN)} ").strip()
-            or "localhost"
+            else input(f"{colorize('Enter server host (ch.tubox.cloud):', Colors.CYAN)} ").strip()
+            or "ch.tubox.cloud"
         )
 
         try:
@@ -131,8 +131,8 @@ class ChatShell(cmd.Cmd):
                 int(parts[1])
                 if len(parts) > 1
                 else int(
-                    input(f"{colorize('Enter server port (12345):', Colors.CYAN)} ").strip()
-                    or "12345"
+                    input(f"{colorize('Enter server port (8891):', Colors.CYAN)} ").strip()
+                    or "8891"
                 )
             )
         except ValueError:
